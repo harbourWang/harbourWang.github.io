@@ -586,6 +586,13 @@ h2 {
 }
 
 .plant,
+.enemy,
+.projectile,
+.bomb-marker {
+  pointer-events: none;
+}
+
+.plant,
 .enemy {
   display: grid;
   place-items: center;
