@@ -6,7 +6,9 @@
   const FIELD_W = COLS * CELL_W;
   const FIELD_H = ROWS * CELL_H;
   const SAVE_KEY = 'green-shield-planet-save-v1';
-  const START_ENERGY = 999999;
+  const START_ENERGY = 250;
+  const MAX_PLANT_LEVEL = 5;
+  const ENDLESS_LEVEL_ID = 'endless';
 
   const cooldowns = {
     short: 5,
@@ -92,6 +94,7 @@
   ];
 
   const levels = [
+    { id: ENDLESS_LEVEL_ID, name: '无尽模式', theme: '无限乱斗', unlockPlants: plants.map((plant) => plant.id), enemyTypes: enemies.map((enemy) => enemy.id), goal: '使用所有植物，挑战无限敌潮', duration: Infinity, spawn: 2.65, intensity: 1, endless: true },
     { id: 1, name: '城市边缘', theme: '肉鸽教学', unlockPlants: ['sun-sprout', 'light-pod'], enemyTypes: ['scout'], goal: '三选一卡牌，构筑本局流派', duration: 58, spawn: 8, intensity: 0.75 },
     { id: 2, name: '公园阵地', theme: '防御构筑', unlockPlants: ['iron-vine'], enemyTypes: ['scout', 'jumper'], goal: '用强化卡把防线堆起来', duration: 68, spawn: 7, intensity: 0.95 },
     { id: 3, name: '废弃磁轨路', theme: '控制与爆发', unlockPlants: ['burst-shroom', 'ice-mint'], enemyTypes: ['jumper', 'armored'], goal: '选择爆炸、冰冻或经济流派', duration: 78, spawn: 6.5, intensity: 1.05 },
@@ -105,18 +108,102 @@
   ];
 
   const rogueCards = [
-    { id: 'solar-overdrive', icon: '☀️', name: '阳光过载', rarity: 'common', desc: '所有太阳 +15 能量，日能芽产出速度 +18%。', apply: (game) => { game.mods.sunValue += 15; game.mods.economyRate += 0.18; } },
-    { id: 'pea-permit', icon: '🫘', name: '光弹许可', rarity: 'common', desc: '射击类植物伤害 +30%，攻速 +18%。', apply: (game) => { game.mods.shootDamage += 0.3; game.mods.fireRate += 0.18; } },
-    { id: 'cheap-clone', icon: '🧬', name: '复制栽培', rarity: 'common', desc: '植物消耗 -15%，并获得 2 次免费种植。', apply: (game) => { game.mods.costScale *= 0.85; game.mods.freePlantCharges += 2; } },
-    { id: 'ice-mark', icon: '❄️', name: '冰雾标记', rarity: 'common', desc: '减速时间 +1.4 秒；受减速敌人承受伤害 +45%。', apply: (game) => { game.mods.slowBonus += 1.4; game.mods.slowedDamage += 0.45; } },
-    { id: 'thorn-wall', icon: '🛡️', name: '铁藤反击', rarity: 'common', desc: '植物最大生命 +30%；防御植物被攻击时反伤。', apply: (game) => { game.mods.plantHp += 0.3; game.mods.wallThorns += 22; buffExistingPlants(game, 0.3); } },
-    { id: 'chain-spines', icon: '🌵', name: '棘刺连锁', rarity: 'rare', desc: '直线弹体穿透 +1，穿透弹与光弹伤害 +20%。', apply: (game) => { game.mods.pierceBonus += 1; game.mods.shootDamage += 0.2; } },
-    { id: 'burst-kill', icon: '💥', name: '击杀爆裂', rarity: 'rare', desc: '敌人被击破时产生小范围爆炸，伤害可叠加。', apply: (game) => { game.mods.killSplashDamage += 48; } },
-    { id: 'star-rain', icon: '🌟', name: '星火雨', rarity: 'rare', desc: '投掷/爆炸伤害 +50%，范围 +0.35 格。', apply: (game) => { game.mods.lobDamage += 0.5; game.mods.lobRadius += 0.35; } },
-    { id: 'magnetic-hole', icon: '🧲', name: '磁暴漏洞', rarity: 'rare', desc: '破甲敌人额外承受 +65% 伤害，磁吸花冷却更快。', apply: (game) => { game.mods.magnetVuln += 0.65; game.mods.debuffRate += 0.35; } },
-    { id: 'bean-gatling', icon: '⚡', name: '豆荚机关枪', rarity: 'rare', desc: '射击植物有 35% 概率追加一发弹体。', apply: (game) => { game.mods.extraShotChance += 0.35; } },
-    { id: 'laser-split', icon: '🔆', name: '激光分裂', rarity: 'epic', desc: '激光额外命中 2 个目标，激光伤害 +30%。', apply: (game) => { game.mods.beamTargets += 2; game.mods.beamDamage += 0.3; } },
-    { id: 'gaia-heartbeat', icon: '🌍', name: '盖亚心跳', rarity: 'epic', desc: '每 12 秒释放全屏脉冲，伤害随选择次数成长。', apply: (game) => { game.mods.globalPulseDamage += 24; } }
+    {
+      id: 'solar-overdrive', icon: '☀️', name: '阳光过载', rarity: 'common',
+      levels: [
+        { desc: 'Lv1：全体植物攻速 +10%，太阳价值 +15。', apply: (game) => { game.mods.fireRate += 0.1; game.mods.sunValue += 15; game.mods.economyRate += 0.16; } },
+        { desc: 'Lv2：全体植物攻速 +14%，太阳价值 +25。', apply: (game) => { game.mods.fireRate += 0.14; game.mods.sunValue += 25; game.mods.economyRate += 0.24; } },
+        { desc: 'Lv3：全体植物攻速 +20%，太阳价值 +40。', apply: (game) => { game.mods.fireRate += 0.2; game.mods.sunValue += 40; game.mods.economyRate += 0.34; } }
+      ]
+    },
+    {
+      id: 'pea-permit', icon: '🫘', name: '光弹许可', rarity: 'common',
+      levels: [
+        { desc: 'Lv1：射击类植物伤害 +24%，攻速 +12%。', apply: (game) => { game.mods.shootDamage += 0.24; game.mods.fireRate += 0.12; } },
+        { desc: 'Lv2：射击类植物伤害 +32%，攻速 +16%。', apply: (game) => { game.mods.shootDamage += 0.32; game.mods.fireRate += 0.16; } },
+        { desc: 'Lv3：射击类植物伤害 +45%，攻速 +22%。', apply: (game) => { game.mods.shootDamage += 0.45; game.mods.fireRate += 0.22; } }
+      ]
+    },
+    {
+      id: 'cheap-clone', icon: '🧬', name: '复制栽培', rarity: 'common',
+      levels: [
+        { desc: 'Lv1：植物最大生命 +12%，本局保留 2 次免费部署。', apply: (game) => { game.mods.plantHp += 0.12; game.mods.freePlantCharges += 2; buffExistingPlants(game, 0.12); } },
+        { desc: 'Lv2：植物最大生命 +16%，本局保留 3 次免费部署。', apply: (game) => { game.mods.plantHp += 0.16; game.mods.freePlantCharges += 3; buffExistingPlants(game, 0.16); } },
+        { desc: 'Lv3：植物最大生命 +24%，本局保留 4 次免费部署。', apply: (game) => { game.mods.plantHp += 0.24; game.mods.freePlantCharges += 4; buffExistingPlants(game, 0.24); } }
+      ]
+    },
+    {
+      id: 'ice-mark', icon: '❄️', name: '冰雾标记', rarity: 'common',
+      levels: [
+        { desc: 'Lv1：减速时间 +1 秒；减速敌人受伤 +30%。', apply: (game) => { game.mods.slowBonus += 1; game.mods.slowedDamage += 0.3; } },
+        { desc: 'Lv2：减速时间 +1.4 秒；减速敌人受伤 +42%。', apply: (game) => { game.mods.slowBonus += 1.4; game.mods.slowedDamage += 0.42; } },
+        { desc: 'Lv3：减速时间 +2 秒；减速敌人受伤 +58%。', apply: (game) => { game.mods.slowBonus += 2; game.mods.slowedDamage += 0.58; } }
+      ]
+    },
+    {
+      id: 'thorn-wall', icon: '🛡️', name: '铁藤反击', rarity: 'common',
+      levels: [
+        { desc: 'Lv1：植物最大生命 +18%；防御植物反伤 18。', apply: (game) => { game.mods.plantHp += 0.18; game.mods.wallThorns += 18; buffExistingPlants(game, 0.18); } },
+        { desc: 'Lv2：植物最大生命 +24%；防御植物反伤 28。', apply: (game) => { game.mods.plantHp += 0.24; game.mods.wallThorns += 28; buffExistingPlants(game, 0.24); } },
+        { desc: 'Lv3：植物最大生命 +34%；防御植物反伤 42。', apply: (game) => { game.mods.plantHp += 0.34; game.mods.wallThorns += 42; buffExistingPlants(game, 0.34); } }
+      ]
+    },
+    {
+      id: 'chain-spines', icon: '🌵', name: '棘刺连锁', rarity: 'rare',
+      levels: [
+        { desc: 'Lv1：直线弹体穿透 +1，穿透/光弹伤害 +16%。', apply: (game) => { game.mods.pierceBonus += 1; game.mods.shootDamage += 0.16; } },
+        { desc: 'Lv2：直线弹体穿透 +1，穿透/光弹伤害 +24%。', apply: (game) => { game.mods.pierceBonus += 1; game.mods.shootDamage += 0.24; } },
+        { desc: 'Lv3：直线弹体穿透 +2，穿透/光弹伤害 +32%。', apply: (game) => { game.mods.pierceBonus += 2; game.mods.shootDamage += 0.32; } }
+      ]
+    },
+    {
+      id: 'burst-kill', icon: '💥', name: '击杀爆裂', rarity: 'rare',
+      levels: [
+        { desc: 'Lv1：敌人被击破时产生 38 点小范围爆炸。', apply: (game) => { game.mods.killSplashDamage += 38; } },
+        { desc: 'Lv2：敌人被击破时产生 54 点小范围爆炸。', apply: (game) => { game.mods.killSplashDamage += 54; } },
+        { desc: 'Lv3：敌人被击破时产生 76 点小范围爆炸。', apply: (game) => { game.mods.killSplashDamage += 76; } }
+      ]
+    },
+    {
+      id: 'star-rain', icon: '🌟', name: '星火雨', rarity: 'rare',
+      levels: [
+        { desc: 'Lv1：投掷/爆炸伤害 +35%，范围 +0.25 格。', apply: (game) => { game.mods.lobDamage += 0.35; game.mods.lobRadius += 0.25; } },
+        { desc: 'Lv2：投掷/爆炸伤害 +48%，范围 +0.35 格。', apply: (game) => { game.mods.lobDamage += 0.48; game.mods.lobRadius += 0.35; } },
+        { desc: 'Lv3：投掷/爆炸伤害 +68%，范围 +0.5 格。', apply: (game) => { game.mods.lobDamage += 0.68; game.mods.lobRadius += 0.5; } }
+      ]
+    },
+    {
+      id: 'magnetic-hole', icon: '🧲', name: '磁暴漏洞', rarity: 'rare',
+      levels: [
+        { desc: 'Lv1：破甲敌人额外受伤 +45%，磁吸花冷却更快。', apply: (game) => { game.mods.magnetVuln += 0.45; game.mods.debuffRate += 0.24; } },
+        { desc: 'Lv2：破甲敌人额外受伤 +62%，磁吸花冷却更快。', apply: (game) => { game.mods.magnetVuln += 0.62; game.mods.debuffRate += 0.34; } },
+        { desc: 'Lv3：破甲敌人额外受伤 +85%，磁吸花冷却更快。', apply: (game) => { game.mods.magnetVuln += 0.85; game.mods.debuffRate += 0.46; } }
+      ]
+    },
+    {
+      id: 'bean-gatling', icon: '⚡', name: '豆荚机关枪', rarity: 'rare',
+      levels: [
+        { desc: 'Lv1：射击植物有 22% 概率追加一发弹体。', apply: (game) => { game.mods.extraShotChance += 0.22; } },
+        { desc: 'Lv2：射击植物有 30% 概率追加一发弹体。', apply: (game) => { game.mods.extraShotChance += 0.3; } },
+        { desc: 'Lv3：射击植物有 42% 概率追加一发弹体。', apply: (game) => { game.mods.extraShotChance += 0.42; } }
+      ]
+    },
+    {
+      id: 'laser-split', icon: '🔆', name: '激光分裂', rarity: 'epic',
+      levels: [
+        { desc: 'Lv1：激光额外命中 1 个目标，激光伤害 +20%。', apply: (game) => { game.mods.beamTargets += 1; game.mods.beamDamage += 0.2; } },
+        { desc: 'Lv2：激光额外命中 2 个目标，激光伤害 +28%。', apply: (game) => { game.mods.beamTargets += 2; game.mods.beamDamage += 0.28; } },
+        { desc: 'Lv3：激光额外命中 3 个目标，激光伤害 +40%。', apply: (game) => { game.mods.beamTargets += 3; game.mods.beamDamage += 0.4; } }
+      ]
+    },
+    {
+      id: 'gaia-heartbeat', icon: '🌍', name: '盖亚心跳', rarity: 'epic',
+      levels: [
+        { desc: 'Lv1：每 12 秒释放 22 点全屏自然脉冲。', apply: (game) => { game.mods.globalPulseDamage += 22; } },
+        { desc: 'Lv2：每 12 秒释放 34 点全屏自然脉冲。', apply: (game) => { game.mods.globalPulseDamage += 34; } },
+        { desc: 'Lv3：每 12 秒释放 52 点全屏自然脉冲。', apply: (game) => { game.mods.globalPulseDamage += 52; } }
+      ]
+    }
   ];
 
   const state = {
@@ -208,7 +295,8 @@
   }
 
   function unlockedPlantIds(levelId = state.save.unlockedLevel) {
-    return plants.slice(0, 5).map((plant) => plant.id);
+    if (levelId === ENDLESS_LEVEL_ID) return plants.map((plant) => plant.id);
+    return plants.filter((plant) => plant.unlock <= levelId || plant.unlock === 1).map((plant) => plant.id);
   }
 
   function formatCooldown(plant) {
@@ -252,18 +340,20 @@
   function renderLevels() {
     els.levelList.innerHTML = '';
     levels.forEach((level) => {
-      const locked = level.id > state.save.unlockedLevel;
+      const locked = !level.endless && level.id > state.save.unlockedLevel;
       const button = document.createElement('button');
-      button.className = 'level-card' + (locked ? ' locked' : '');
+      button.className = 'level-card' + (locked ? ' locked' : '') + (level.endless ? ' endless' : '');
       button.disabled = locked;
-      const unlockedNames = level.unlockPlants.map(plantById).filter(Boolean).map((plant) => plant.name).join('、');
+      const unlockedNames = level.endless ? '全部植物' : level.unlockPlants.map(plantById).filter(Boolean).map((plant) => plant.name).join('、');
+      const levelLabel = level.endless ? '无尽模式' : `第${level.id}关`;
+      const stars = level.endless ? `最高 ${state.save.bestEndlessWave || 0} 波` : `${'★'.repeat(state.save.stars[level.id] || 0)}${'☆'.repeat(3 - (state.save.stars[level.id] || 0))}`;
       button.innerHTML = `
-        <span class="level-index">第${level.id}关</span>
+        <span class="level-index">${levelLabel}</span>
         <strong>${level.name}</strong>
         <small>${level.theme}</small>
         <em>${level.goal}</em>
-        <span class="unlock-line">${locked ? '未解锁' : '解锁：' + unlockedNames}</span>
-        <span class="stars">${'★'.repeat(state.save.stars[level.id] || 0)}${'☆'.repeat(3 - (state.save.stars[level.id] || 0))}</span>
+        <span class="unlock-line">${locked ? '未解锁' : '可用：' + unlockedNames}</span>
+        <span class="stars">${stars}</span>
       `;
       button.addEventListener('click', () => startLevel(level.id));
       els.levelList.appendChild(button);
@@ -339,6 +429,13 @@
       globalPulseTimer: 12,
       mods: createRogueMods(),
       chosenCards: [],
+      cardLevels: {},
+      draftChoices: [],
+      draftCount: 0,
+      drafting: false,
+      draftLocked: false,
+      draftUnlockTimer: 0,
+      lastDraftWave: 0,
       tutorialStep: 0,
       events: {
         plantedSun: false,
@@ -363,9 +460,9 @@
     els.battleShell.style.setProperty('--battle-scale', Math.max(0.45, scale).toFixed(3));
   }
 
-  function startLevel(id) {
+  function startLevel(id = ENDLESS_LEVEL_ID) {
     const level = levels.find((item) => item.id === id);
-    if (!level || level.id > state.save.unlockedLevel) return;
+    if (!level || (!level.endless && level.id > state.save.unlockedLevel)) return;
     closeModal();
     state.activeLevel = level;
     state.game = createGame(level);
@@ -380,6 +477,7 @@
     switchScreen('game-screen');
     cancelAnimationFrame(state.raf);
     state.raf = requestAnimationFrame(loop);
+    maybeOfferDraft(true);
   }
 
   function setupBattlefield() {
@@ -443,6 +541,13 @@
       upgradePlant(game.grid[row][col]);
       return;
     }
+    const cost = plantCost(plant);
+    if (game.energy < cost && game.mods.freePlantCharges <= 0) {
+      els.hintText.textContent = `阳光不足，还需要 ${cost - Math.floor(game.energy)}。`;
+      return;
+    }
+    if (game.mods.freePlantCharges > 0) game.mods.freePlantCharges -= 1;
+    else game.energy -= cost;
     addPlant(plant, row, col);
     game.events.plantedShooter = true;
     pulse(cellCenter(row, col).x, cellCenter(row, col).y, '连种');
@@ -480,12 +585,29 @@
   }
 
   function plantCost(plant) {
-    return 0;
+    return Math.max(25, Math.round(plant.cost * state.game.mods.costScale));
+  }
+
+  function plantUpgradeCost(plant) {
+    const baseCost = plantCost(plant.config);
+    return Math.round(baseCost * (1.2 + plant.level * 0.72));
   }
 
   function upgradePlant(plant) {
+    const game = state.game;
+    if (plant.level >= MAX_PLANT_LEVEL) {
+      els.hintText.textContent = `${plant.config.name} 已达 Lv${MAX_PLANT_LEVEL} 满级。`;
+      pulse(plant.x, plant.y - 28, '已满级');
+      return;
+    }
+    const cost = plantUpgradeCost(plant);
+    if (game.energy < cost) {
+      els.hintText.textContent = `升级需要 ${cost} 阳光，还差 ${cost - Math.floor(game.energy)}。`;
+      return;
+    }
+    game.energy -= cost;
     plant.level += 1;
-    plant.maxHp = Math.round(plant.maxHp * 1.22 + 35);
+    plant.maxHp = Math.round(plant.maxHp * 1.16 + 28 + plant.level * 6);
     plant.hp = plant.maxHp;
     plant.el.classList.add('level-up');
     plant.el.querySelector('i').textContent = `Lv${plant.level}`;
@@ -494,6 +616,8 @@
     playSound('power');
     vibrate(16);
     updatePlantHp(plant);
+    syncBattleUi();
+    syncCardStates();
   }
 
   function buffExistingPlants(game, hpRatio) {
@@ -542,7 +666,7 @@
     state.lastTime = now;
     if (game.hitStop > 0) {
       game.hitStop -= baseDt;
-    } else if (!game.paused && !game.ended) {
+    } else if (!game.paused && !game.ended && !game.drafting) {
       updateGame(dt);
     }
     renderGame();
@@ -575,7 +699,6 @@
 
   function updateSuns(dt) {
     const game = state.game;
-    return;
     game.skyTimer -= dt * (game.time < game.solarSlowUntil ? 0.45 : 1);
     if (game.skyTimer <= 0) {
       game.skyTimer = 7 + Math.random() * 3;
@@ -631,8 +754,9 @@
     if (tags.includes('shoot') || tags.includes('pierce')) multiplier += game.mods.shootDamage;
     if (tags.includes('lob') || tags.includes('splash') || tags.includes('bomb')) multiplier += game.mods.lobDamage;
     if (tags.includes('beam')) multiplier += game.mods.beamDamage;
-    multiplier += Math.max(0, (plant.level || 1) - 1) * 0.28;
-    multiplier += Math.min(0.9, (plant.kills || 0) * 0.025);
+    const levelBonus = Math.min(MAX_PLANT_LEVEL - 1, Math.max(0, (plant.level || 1) - 1));
+    multiplier += levelBonus * 0.22;
+    multiplier += Math.min(0.7, (plant.kills || 0) * 0.02);
     return amount * multiplier;
   }
 
@@ -864,8 +988,9 @@
       if (!target && enemy.stun <= 0) {
         const slowFactor = enemy.slow > 0 ? 0.55 : 1;
         const shieldBoost = enemy.config.shieldAura ? 0.9 : 1;
-        enemy.x -= enemy.config.speed * slowFactor * shieldBoost * dt;
-        if (enemy.config.mech && enemy.x < FIELD_W * 0.65) enemy.x -= enemy.config.speed * dt;
+        const speed = enemy.config.speed * (enemy.speedScale || 1);
+        enemy.x -= speed * slowFactor * shieldBoost * dt;
+        if (enemy.config.id === 'mech' && enemy.x < FIELD_W * 0.65) enemy.x -= speed * dt;
       }
       if (enemy.config.shieldAura) grantShields(enemy);
       if (enemy.x < -20) {
@@ -887,7 +1012,7 @@
       pulse(enemy.x, enemy.y, '自爆');
       return;
     }
-    let damage = enemy.config.damage;
+    let damage = enemy.config.damage * (enemy.damageScale || 1);
     if (plant.config.tags.includes('wall') && state.game.mods.wallThorns > 0) {
       damageEnemy(enemy, state.game.mods.wallThorns, plant, true);
       pulse(plant.x, plant.y - 20, '荆棘');
@@ -939,6 +1064,7 @@
       game.waveTimer = 0;
       pulse(FIELD_W / 2, 34, `第 ${game.wave} 波`);
       playSound('warning');
+      maybeOfferDraft(false);
     }
     if (game.wave >= 8 && !game.bossSpawned) {
       spawnEnemy('boss', Math.floor(Math.random() * ROWS));
@@ -946,41 +1072,82 @@
       pulse(FIELD_W - 100, 40, 'Boss乱入');
     }
     if (game.spawnTimer <= 0) {
-      const interval = Math.max(0.55, 2.4 - game.wave * 0.12);
-      game.spawnTimer = interval;
-      const count = Math.min(5, 1 + Math.floor(game.wave / 4));
-      for (let index = 0; index < count; index += 1) {
-        const enemyId = pickEnemyForTime(['scout', 'jumper', 'armored', 'gunner', 'drone', 'engineer', 'bomber', 'mech', 'heavy'], game.time, game.wave);
+      const difficulty = enemyDifficulty(game);
+      game.spawnTimer = difficulty.spawnInterval;
+      for (let index = 0; index < difficulty.spawnCount; index += 1) {
+        const enemyId = pickEnemyForTime(difficulty.pool, game.time, game.wave);
         spawnEnemy(enemyId, Math.floor(Math.random() * ROWS), FIELD_W + 44 + index * 34);
       }
     }
   }
 
+  function enemyDifficulty(game) {
+    const wave = game.wave;
+    const cardPower = game.chosenCards.reduce((sum, choice) => sum + choice.level, 0);
+    const plantPower = plantDefensePower(game);
+    const cardPressure = Math.max(0, cardPower - wave) * 0.032;
+    const plantPressure = wave <= 2 ? 0 : plantPower.pressure;
+    return {
+      hpScale: 1 + (wave - 1) * 0.13 + Math.max(0, wave - 6) * 0.045 + cardPressure + plantPressure,
+      damageScale: 1 + Math.max(0, wave - 2) * 0.055 + cardPressure * 0.75 + plantPressure * 0.62,
+      speedScale: 1 + Math.min(0.36, Math.max(0, wave - 3) * 0.022 + plantPressure * 0.18),
+      spawnInterval: Math.max(0.58, 2.65 - wave * 0.11 - Math.min(0.24, cardPower * 0.01) - Math.min(0.22, plantPower.averageLevel * 0.035)),
+      spawnCount: Math.min(7, 1 + Math.floor((wave + 1) / 4) + (wave >= 9 ? 1 : 0) + (plantPower.maxLevel >= 4 && wave >= 5 ? 1 : 0)),
+      pool: enemyPoolForWave(wave)
+    };
+  }
+
+  function plantDefensePower(game) {
+    if (!game.plantEntities.length) return { averageLevel: 0, maxLevel: 0, pressure: 0 };
+    const totalLevel = game.plantEntities.reduce((sum, plant) => sum + plant.level, 0);
+    const maxLevel = game.plantEntities.reduce((max, plant) => Math.max(max, plant.level), 0);
+    const averageLevel = totalLevel / game.plantEntities.length;
+    const levelPressure = Math.max(0, averageLevel - 1) * 0.035;
+    const boardPressure = Math.min(0.16, game.plantEntities.length * 0.006);
+    const maxLevelPressure = Math.max(0, maxLevel - 3) * 0.035;
+    return {
+      averageLevel,
+      maxLevel,
+      pressure: Math.min(0.38, levelPressure + boardPressure + maxLevelPressure)
+    };
+  }
+
+  function enemyPoolForWave(wave) {
+    const pool = ['scout'];
+    if (wave >= 2) pool.push('jumper', 'armored');
+    if (wave >= 3) pool.push('gunner');
+    if (wave >= 4) pool.push('drone', 'bomber');
+    if (wave >= 5) pool.push('engineer');
+    if (wave >= 7) pool.push('mech');
+    if (wave >= 8) pool.push('heavy');
+    return pool;
+  }
+
   function pickEnemyForTime(pool, time, intensity) {
     const wave = state.game ? state.game.wave : (intensity || 1);
-    const unlocked = pool.filter((id) => {
-      if (wave < 2 && ['jumper', 'gunner', 'drone', 'engineer', 'bomber', 'mech', 'heavy'].includes(id)) return false;
-      if (wave < 4 && ['engineer', 'bomber', 'mech', 'heavy'].includes(id)) return false;
-      if (wave < 7 && ['mech', 'heavy'].includes(id)) return false;
-      return true;
-    });
-    const options = unlocked.length ? unlocked : ['scout'];
-    if (Math.random() < Math.min(0.46, wave * 0.035)) return options[options.length - 1];
+    const options = pool.length ? pool : ['scout'];
+    const eliteChance = Math.min(0.55, 0.08 + wave * 0.035);
+    if (Math.random() < eliteChance) return options[options.length - 1];
+    if (Math.random() < 0.35 && options.length > 2) return options[Math.max(0, options.length - 2)];
     return options[Math.floor(Math.random() * options.length)] || 'scout';
   }
 
   function spawnEnemy(id, row, x = FIELD_W + 44) {
+    const game = state.game;
     const config = enemyById(id);
-    const levelScale = 1 + (state.game.wave - 1) * 0.18;
+    const difficulty = enemyDifficulty(game);
+    const hpScale = config.boss ? Math.max(1, difficulty.hpScale * 0.72) : difficulty.hpScale;
     const entity = {
       id: `enemy-${Date.now()}-${Math.random().toString(16).slice(2)}`,
       config,
       row,
       x,
       y: row * CELL_H + CELL_H / 2,
-      hp: config.hp * (config.boss ? Math.max(1, levelScale * 0.65) : levelScale),
-      maxHp: config.hp * (config.boss ? Math.max(1, levelScale * 0.65) : levelScale),
+      hp: config.hp * hpScale,
+      maxHp: config.hp * hpScale,
       attackTimer: config.attackRate,
+      damageScale: difficulty.damageScale,
+      speedScale: difficulty.speedScale,
       slow: 0,
       poison: 0,
       stun: 0,
@@ -1033,46 +1200,96 @@
   function maybeOfferDraft(opening) {
     const game = state.game;
     if (!game || game.ended || game.drafting) return;
-    const maxDrafts = Math.min(6, 2 + Math.ceil(game.level.duration / 28));
-    if (!opening && (game.time < game.nextDraftAt || game.draftCount >= maxDrafts)) return;
-    game.drafting = true;
+    if (!opening && game.lastDraftWave === game.wave) return;
     game.draftChoices = pickRogueCards(game);
-    if (!opening) game.nextDraftAt += 22;
-    els.rewardTitle.textContent = opening ? '开局选择一张核心强化' : `第 ${game.draftCount + 1} 次构筑强化`;
-    els.rewardSubtitle.textContent = '战斗暂停，选择后继续刷怪。强化只在本局生效，可重复叠加。';
+    if (!game.draftChoices.length) return;
+    game.drafting = true;
+    if (!opening) game.lastDraftWave = game.wave;
+    els.rewardTitle.textContent = opening ? '开局选择一张核心强化' : `第 ${game.wave} 波构筑强化`;
+    els.rewardSubtitle.textContent = '战斗暂停，从三种技能中选择一种；重复选择会升到 Lv2 / Lv3。';
     els.rewardOptions.innerHTML = '';
+    game.draftLocked = !opening;
+    game.draftUnlockTimer = game.draftLocked ? window.setTimeout(unlockDraftChoices, 1000) : 0;
     game.draftChoices.forEach((card) => {
+      const nextLevel = nextCardLevel(game, card);
       const button = document.createElement('button');
       button.className = `reward-option ${card.rarity}`;
+      button.disabled = game.draftLocked;
       button.innerHTML = `
         <span class="reward-icon">${card.icon}</span>
+        <span class="reward-level">${cardLevelLabel(game, card)}</span>
         <strong>${card.name}</strong>
         <em>${rarityName(card.rarity)}</em>
-        <p>${card.desc}</p>
+        <p>${card.levels[nextLevel - 1].desc}</p>
       `;
       button.addEventListener('click', () => chooseRogueCard(card));
       els.rewardOptions.appendChild(button);
     });
+    els.rewardModal.classList.toggle('draft-locked', game.draftLocked);
     els.rewardModal.classList.remove('hidden');
     playSound('warning');
   }
 
+  function unlockDraftChoices() {
+    const game = state.game;
+    if (!game || !game.drafting) return;
+    game.draftLocked = false;
+    game.draftUnlockTimer = 0;
+    els.rewardModal.classList.remove('draft-locked');
+    els.rewardOptions.querySelectorAll('.reward-option').forEach((button) => {
+      button.disabled = false;
+    });
+    els.rewardSubtitle.textContent = '请选择一种技能强化，重复选择会升到 Lv2 / Lv3。';
+  }
+
   function pickRogueCards(game) {
-    const pool = rogueCards.filter((card) => card.rarity !== 'epic' || game.level.id >= 5 || game.draftCount >= 2);
-    const shuffled = [...pool].sort(() => Math.random() - 0.5);
-    return shuffled.slice(0, 3);
+    const pool = rogueCards.filter((card) => isCardAvailable(game, card));
+    const weighted = pool.flatMap((card) => {
+      const currentLevel = game.cardLevels[card.id] || 0;
+      const repeats = currentLevel > 0 ? 2 : 1;
+      return Array.from({ length: repeats }, () => card);
+    });
+    const shuffled = [...weighted].sort(() => Math.random() - 0.5);
+    const choices = [];
+    shuffled.forEach((card) => {
+      if (choices.length < 3 && !choices.includes(card)) choices.push(card);
+    });
+    return choices;
+  }
+
+  function isCardAvailable(game, card) {
+    if ((game.cardLevels[card.id] || 0) >= card.levels.length) return false;
+    if (card.rarity === 'rare' && game.wave < 2 && game.draftCount < 1) return false;
+    if (card.rarity === 'epic' && game.wave < 4 && game.draftCount < 3) return false;
+    return true;
+  }
+
+  function nextCardLevel(game, card) {
+    return Math.min(card.levels.length, (game.cardLevels[card.id] || 0) + 1);
+  }
+
+  function cardLevelLabel(game, card) {
+    const currentLevel = game.cardLevels[card.id] || 0;
+    const nextLevel = nextCardLevel(game, card);
+    return currentLevel ? `Lv${currentLevel} → Lv${nextLevel}` : `Lv${nextLevel}`;
   }
 
   function chooseRogueCard(card) {
     const game = state.game;
-    if (!game) return;
-    card.apply(game);
-    game.chosenCards.push(card);
+    if (!game || game.draftLocked) return;
+    if (game.draftUnlockTimer) {
+      clearTimeout(game.draftUnlockTimer);
+      game.draftUnlockTimer = 0;
+    }
+    const level = nextCardLevel(game, card);
+    card.levels[level - 1].apply(game);
+    game.cardLevels[card.id] = level;
+    game.chosenCards.push({ card, level });
     game.draftCount += 1;
     game.drafting = false;
     els.rewardModal.classList.add('hidden');
-    els.hintText.textContent = `获得强化：${card.name}。当前卡组等级 ${game.chosenCards.length + 1}`;
-    pulse(FIELD_W / 2, 36, `获得 ${card.name}`);
+    els.hintText.textContent = `获得强化：${card.name} Lv${level}。当前构筑等级 ${game.chosenCards.length + 1}`;
+    pulse(FIELD_W / 2, 36, `${card.name} Lv${level}`);
     playSound('win');
     state.lastTime = performance.now();
     syncBattleUi();
@@ -1258,10 +1475,10 @@
     if (!game) return;
     els.energyText.textContent = Math.floor(game.energy);
     els.baseLifeText.textContent = game.baseLife;
-    els.rogueLevelText.textContent = game.chosenCards.length + 1;
-    els.levelTitle.textContent = `第${game.level.id}关 · ${game.level.name}`;
+    els.rogueLevelText.textContent = game.wave;
+    els.levelTitle.textContent = game.level.endless ? game.level.name : `第${game.level.id}关 · ${game.level.name}`;
     els.levelGoal.textContent = game.level.goal;
-    els.waveProgress.style.width = `${Math.min(100, (game.time / game.level.duration) * 100)}%`;
+    els.waveProgress.style.width = `${game.level.endless ? (game.waveTimer / 18) * 100 : Math.min(100, (game.time / game.level.duration) * 100)}%`;
     els.pauseButton.textContent = game.paused ? '继续' : '暂停';
   }
 
@@ -1292,17 +1509,21 @@
     cancelAnimationFrame(state.raf);
     playSound(win ? 'win' : 'lose');
     vibrate(win ? 35 : 120);
-    state.save.completed[game.level.id] = true;
-    state.save.stars[game.level.id] = Math.max(state.save.stars[game.level.id] || 0, Math.min(3, Math.ceil(game.wave / 5)));
-    state.save.unlockedLevel = 10;
+    if (game.level.endless) {
+      state.save.bestEndlessWave = Math.max(state.save.bestEndlessWave || 0, game.wave);
+    } else {
+      state.save.completed[game.level.id] = true;
+      state.save.stars[game.level.id] = Math.max(state.save.stars[game.level.id] || 0, Math.min(3, Math.ceil(game.wave / 5)));
+      state.save.unlockedLevel = 10;
+    }
     persistSave();
     showModal({
-      eyebrow: '无限乱斗结算',
+      eyebrow: game.level.endless ? '无尽模式结算' : '无限乱斗结算',
       title: win ? '防线超载胜利' : '防线被突破',
       message,
       reward: `最高波次：${game.wave} · 击破敌人：${game.enemyCount}。继续叠蘑菇等级可以撑更久。`,
       primaryText: '再来一局',
-      primary: () => startLevel(1)
+      primary: () => startLevel(game.level.id)
     });
   }
 
@@ -1386,7 +1607,7 @@
     document.addEventListener('click', (event) => {
       if (event.target.closest('button')) playSound('click');
     });
-    document.getElementById('start-button').addEventListener('click', () => startLevel(Math.min(state.save.unlockedLevel, 10)));
+    document.getElementById('start-button').addEventListener('click', () => startLevel());
     document.getElementById('levels-button').addEventListener('click', () => switchScreen('level-screen'));
     document.getElementById('codex-button').addEventListener('click', () => switchScreen('codex-screen'));
     document.getElementById('settings-button').addEventListener('click', () => switchScreen('settings-screen'));
