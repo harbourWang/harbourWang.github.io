@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>绿盾星球防线</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main id="app" class="app">
+    <section id="menu-screen" class="screen screen--active menu-screen">
+      <div class="hero-card">
+        <p class="eyebrow">公元 2188 · 无限乱斗启动</p>
+        <h1>绿盾星球防线</h1>
+        <p class="subtitle">无限阳光、连续种蘑菇、同格叠层升级，在越来越强的敌潮中撑到更高波次。</p>
+        <div class="menu-actions">
+          <button id="start-button" class="primary-button">开始游戏</button>
+          <button id="levels-button" class="ghost-button">关卡选择</button>
+          <button id="codex-button" class="ghost-button">植物图鉴</button>
+          <button id="settings-button" class="ghost-button">设置</button>
+        </div>
+      </div>
+      <div class="status-card">
+        <h2>防线档案</h2>
+        <p>已通关：<span id="save-level-count">0</span>/10</p>
+        <p>最高星章：<span id="save-star-count">0</span></p>
+        <p>最新解锁：<span id="save-unlock-text">日能芽、光弹豆荚</span></p>
+      </div>
+    </section>
+
+    <section id="level-screen" class="screen level-screen">
+      <div class="panel wide-panel">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">任务列表</p>
+            <h2>选择关卡</h2>
+          </div>
+          <button class="icon-button" data-screen="menu-screen">返回</button>
+        </div>
+        <div id="level-list" class="level-list"></div>
+      </div>
+    </section>
+
+    <section id="codex-screen" class="screen codex-screen">
+      <div class="panel wide-panel">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">生态武装数据库</p>
+            <h2>植物图鉴</h2>
+          </div>
+          <button class="icon-button" data-screen="menu-screen">返回</button>
+        </div>
+        <div id="codex-list" class="codex-list"></div>
+      </div>
+    </section>
+
+    <section id="settings-screen" class="screen settings-screen">
+      <div class="panel settings-panel">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">系统设置</p>
+            <h2>设置</h2>
+          </div>
+          <button class="icon-button" data-screen="menu-screen">返回</button>
+        </div>
+        <label class="toggle-row">
+          <span>音效</span>
+          <input id="sound-toggle" type="checkbox">
+        </label>
+        <label class="toggle-row">
+          <span>振动</span>
+          <input id="vibration-toggle" type="checkbox">
+        </label>
+        <div class="setting-actions">
+          <button id="sound-test-button" class="ghost-button">试听音效</button>
+          <button id="vibration-test-button" class="ghost-button">测试振动</button>
+        </div>
+        <button id="reset-save-button" class="danger-button">重置本地存档</button>
+      </div>
+    </section>
+
+    <section id="game-screen" class="screen game-screen">
+      <div id="battle-shell" class="battle-shell">
+        <header class="battle-topbar">
+          <div class="resource-pill"><span class="sun-icon">☀</span><span id="energy-text">∞</span></div>
+          <div class="level-pill"><span id="level-title">无限乱斗</span><small id="level-goal">撑住越来越强的敌潮</small></div>
+          <div class="life-pill">波次 <span id="rogue-level-text">1</span></div>
+          <div class="life-pill">基地生命 <span id="base-life-text">3</span></div>
+          <button id="speed-button" class="icon-button">1×</button>
+          <button id="pause-button" class="icon-button">暂停</button>
+          <button id="exit-button" class="icon-button exit-button">退出</button>
+        </header>
+
+        <div class="battle-main">
+          <aside id="card-bar" class="card-bar"></aside>
+          <div class="field-wrap">
+            <div class="field-sky">
+              <div class="planet planet--one"></div>
+              <div class="planet planet--two"></div>
+              <div id="wave-progress" class="wave-progress"><span></span></div>
+            </div>
+            <div id="battlefield" class="battlefield" aria-label="5行9列战斗网格"></div>
+          </div>
+        </div>
+
+        <footer class="battle-footer">
+          <button id="shovel-button" class="tool-button">铲除工具</button>
+          <button id="auto-sun-button" class="tool-button">连种模式：开</button>
+          <p id="hint-text">选择一种蘑菇后可一直点击格子种植；点已有植物会叠层升级。</p>
+          <div id="tutorial-panel" class="tutorial-panel hidden">
+            <strong id="tutorial-title">无限乱斗教程</strong>
+            <span id="tutorial-text">选择一种蘑菇，连续布满防线。</span>
+          </div>
+        </footer>
+      </div>
+    </section>
+
+    <div id="reward-modal" class="modal hidden">
+      <div class="modal-card reward-card">
+        <p class="eyebrow">肉鸽抉择</p>
+        <h2 id="reward-title">选择一张强化卡</h2>
+        <p id="reward-subtitle">每次选择都会改变本局流派。</p>
+        <div id="reward-options" class="reward-options"></div>
+      </div>
+    </div>
+
+    <div id="modal" class="modal hidden">
+      <div class="modal-card">
+        <p id="modal-eyebrow" class="eyebrow">任务结果</p>
+        <h2 id="modal-title">胜利</h2>
+        <p id="modal-message">防线稳定。</p>
+        <div id="modal-reward" class="reward-line"></div>
+        <div class="modal-actions">
+          <button id="modal-primary" class="primary-button">继续</button>
+          <button id="modal-secondary" class="ghost-button">返回主界面</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="game.js"></script>
+</body>
+</html>
